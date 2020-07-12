@@ -1,7 +1,7 @@
 package com.sourcedevil.ref.rhoar.camel.gateway;
 
 import java.util.ArrayList;
-
+import org.apache.camel.Processor;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.model.dataformat.JsonLibrary;
 import org.apache.camel.util.toolbox.AggregationStrategies;
@@ -17,48 +17,54 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix="gateway")
 public class GatewayRouter extends RouteBuilder {
 
-    private String productsServiceUrl, offerServiceUrl;
-
-    private static final String REST_ENDPOINT_OFFER=
-            "http4:%s/offers/list?httpClient.connectTimeout=1000" +
-                    "&bridgeEndpoint=true" +
-                    "&copyHeaders=true" +
-                    "&connectionClose=true";
+   
     
-    private static final String REST_ENDPOINT_PRODUCT=
-            "http4:%s/camel/feature/config/64?httpClient.connectTimeout=1000" +
-                    "&bridgeEndpoint=true" +
-                    "&copyHeaders=true" +
-                    "&connectionClose=true";
+    private static final String REST_ENDPOINT_ECHO= "http4:echo-api.3scale.net?httpClient.connectTimeout=1000" +
+            "&bridgeEndpoint=true" +
+            "&copyHeaders=true" +
+            "&connectionClose=true";
+    
+    private static final String REST_ENDPOINT_FINTO= "http4:api.finto.fi/rest/v1/vocabularies?httpClient.connectTimeout=1000" +
+            "&bridgeEndpoint=true" +
+            "&copyHeaders=true" +
+            "&connectionClose=true";
 
     @Override
     public void configure() {
-        from("direct:offerServiceUrl").streamCaching()
-                .toF(REST_ENDPOINT_OFFER, offerServiceUrl)
+        from("direct:echoServiceUrl").streamCaching()
+                .to(REST_ENDPOINT_ECHO)
                 .log("Response from Microprofile microservice: " +
                         "${body}")
                 .convertBodyTo(String.class)
                 .end();
 
-        from("direct:productsServiceUrl").streamCaching()
-                .toF(REST_ENDPOINT_PRODUCT, productsServiceUrl)
+        from("direct:fintoServiceUrl").streamCaching()
+                .to(REST_ENDPOINT_FINTO)
                 .log("Response from Spring Boot microservice: " +
                         "${body}")
                 .convertBodyTo(String.class)
                 .end();
 
         rest()
-            .get("/gateway").enableCORS(true)
+            .get("/gateway").enableCORS(true)            
             .route()
                 .multicast(AggregationStrategies.flexible()
                         .accumulateInCollection(ArrayList.class))
                 .parallelProcessing()
-                    .to("direct:offerServiceUrl")
-                    .to("direct:productsServiceUrl")
+                    .to("direct:fintoServiceUrl")
+                    .to("direct:echoServiceUrl")
                 .end()
             .marshal().json(JsonLibrary.Jackson)
             .convertBodyTo(String.class)
         .endRest();
+                
+        rest()
+        .get("/finto").enableCORS(true)            
+        .to("direct:fintoServiceUrl");
+        
+        rest()
+        .get("/echo").enableCORS(true)
+        .to("direct:echoServiceUrl");
         
         rest("/health").get("").produces("application/json").to("direct:health");
 
@@ -70,12 +76,5 @@ public class GatewayRouter extends RouteBuilder {
                     + "}\n");
     }
 
-    public void setOffersServiceUrl(String offerServiceUrl) {
-        this.offerServiceUrl = offerServiceUrl;
-    }
-
-    public void setProductsServiceUrl(String productsServiceUrl) {
-        this.productsServiceUrl = productsServiceUrl;
-    }
-
+   
 }
