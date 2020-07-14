@@ -29,6 +29,11 @@ public class GatewayRouter extends RouteBuilder {
             "&copyHeaders=true" +
             "&connectionClose=true";
 
+    private static final String REST_ENDPOINT_WINNER= "http4:sourcedevil-th1-raffle-api-sourcedevil-th1-raffle-api.apps.us-west-1.starter.openshift-online.com/raffle/raffle/ganador?httpClient.connectTimeout=1000" +
+            "&bridgeEndpoint=true" +
+            "&copyHeaders=true" +
+            "&connectionClose=true";
+
     @Override
     public void configure() {
         from("direct:echoServiceUrl").streamCaching()
@@ -40,6 +45,13 @@ public class GatewayRouter extends RouteBuilder {
 
         from("direct:fintoServiceUrl").streamCaching()
                 .to(REST_ENDPOINT_FINTO)
+                .log("Response from Spring Boot microservice: " +
+                        "${body}")
+                .convertBodyTo(String.class)
+                .end();
+
+        from("direct:winnerServiceUrl").streamCaching()
+                .to(REST_ENDPOINT_WINNER)
                 .log("Response from Spring Boot microservice: " +
                         "${body}")
                 .convertBodyTo(String.class)
@@ -62,6 +74,10 @@ public class GatewayRouter extends RouteBuilder {
         .get("/finto").enableCORS(true)            
         .to("direct:fintoServiceUrl");
         
+        rest()
+        .get("/winner").enableCORS(true)            
+        .to("direct:winnerServiceUrl");
+
         rest()
         .get("/echo").enableCORS(true)
         .to("direct:echoServiceUrl");
